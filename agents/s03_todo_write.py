@@ -96,8 +96,19 @@ def safe_path(p: str) -> Path:
         raise ValueError(f"Path escapes workspace: {p}")
     return path
 
-def run_bash(command: str) -> str:
-    dangerous = ["rm -rf /", "sudo", "shutdown", "reboot", "> /dev/"]
+def run_command(command: str) -> str:
+    dangerous = [
+        # Linux / macOS
+        "rm -rf /", "rm -rf /*", "shutdown", "reboot", "halt", "poweroff",
+        ":(){:|:&};:", "> /dev/", "mkfs", "dd if=",
+
+        # Windows
+        "format", "del /f", "rd /s", "shutdown", "taskkill",
+        "powershell -command", "Remove-Item", "Stop-Computer",
+
+        # 通用危险符号
+        "sudo"
+    ]
     if any(d in command for d in dangerous):
         return "Error: Dangerous command blocked"
     try:
@@ -139,7 +150,7 @@ def run_edit(path: str, old_text: str, new_text: str) -> str:
 
 
 TOOL_HANDLERS = {
-    "bash":       lambda **kw: run_bash(kw["command"]),
+    "run_command":       lambda **kw: run_command(kw["command"]),
     "read_file":  lambda **kw: run_read(kw["path"], kw.get("limit")),
     "write_file": lambda **kw: run_write(kw["path"], kw["content"]),
     "edit_file":  lambda **kw: run_edit(kw["path"], kw["old_text"], kw["new_text"]),
@@ -147,7 +158,7 @@ TOOL_HANDLERS = {
 }
 
 TOOLS = [
-    {"name": "bash", "description": "Run a shell command.",
+    {"name": "run_command", "description": "Run a command.",
      "input_schema": {"type": "object", "properties": {"command": {"type": "string"}}, "required": ["command"]}},
     {"name": "read_file", "description": "Read file contents.",
      "input_schema": {"type": "object", "properties": {"path": {"type": "string"}, "limit": {"type": "integer"}}, "required": ["path"]}},
